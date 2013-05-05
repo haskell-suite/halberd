@@ -1,0 +1,21 @@
+name:                halberd
+version:             0.1
+license:             BSD3
+license-file:        LICENSE
+author:              Erik Hesselink
+maintainer:          hesselink@gmail.com
+category:            Development
+build-type:          Simple
+cabal-version:       >=1.8
+
+executable halberd
+  build-depends:       base ==4.5.*
+                     , containers
+                     , haskell-packages
+                     , haskell-names
+                     , haskell-src-exts >= 1.14
+                     , Cabal >= 1.17
+                     , filepath
+                     , pretty-show
+  hs-source-dirs:      src
+  main-is:             Halberd.hs
