@@ -53,8 +53,8 @@ toPackageRef pi = PackageRef (Cabal.installedPackageId pi) (Cabal.sourcePackageI
 suggestedImports module_ =
   do pkgs <- getPackages
      [(annSrc, _)] <- analyseModules [fmap srcInfoSpan module_]
-     let (_, qnames) = unzip $ collectUnboundNames annSrc
-     trace (show qnames) (return ())
+     let x@(typeNames, valueNames) = collectUnboundNames annSrc
+     trace (show x) $ do
      (valueDefs, typeDefs) <-
        fmap mconcat $ forM pkgs $ \pkg ->
          fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
@@ -62,7 +62,7 @@ suggestedImports module_ =
             return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
      let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
          typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
-         names      = mapMaybe unQName qnames
+         names      = mapMaybe unQName valueNames
      return (map (flip Map.lookup valueTable) names)
 
 gUnqual (GName _ name) = name

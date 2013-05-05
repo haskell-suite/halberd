@@ -1,12 +1,15 @@
 module Halberd.CollectNames
-  ( NameSpace(..)
-  , NameSpacedQName
-  , collectUnboundNames
+  ( collectUnboundNames
   ) where
 
+import           Control.Monad
+import           Data.Either
+import           Data.Function
 import           Data.Generics
+import           Data.List
 import           Data.Maybe
-import           Language.Haskell.Exts.Annotated (SrcSpan)
+import           Data.Ord
+import           Language.Haskell.Exts.Annotated        (SrcSpan)
 import           Language.Haskell.Exts.Annotated.Syntax
 import           Language.Haskell.Modules
 
@@ -14,28 +17,32 @@ import           Language.Haskell.Modules
 -- Collecting the (unbound) names
 ------------------------------------------------------------------------------
 
-data NameSpace = TypeSpace | ValueSpace
+data NameSpace = TypeSpace | ValueSpace  -- DON'T CHANGE THE ORDER
     deriving (Eq, Ord, Show)
 
 type NameSpacedQName = (NameSpace, QName (Scoped SrcSpan))
 
 
-collectUnboundNames :: Module (Scoped SrcSpan) -> [NameSpacedQName]
-collectUnboundNames = do
-    mapMaybe qNameNotInScope . namesFromAST
+collectUnboundNames :: Module (Scoped SrcSpan)
+                    -> ([QName (Scoped SrcSpan)], [QName (Scoped SrcSpan)])
+collectUnboundNames module_ = partitionEithers $ do
+    (nameSpace, qname) <- namesFromAST module_
+    guard (qNameNotInScope qname)
+    return $ case nameSpace of
+        TypeSpace  -> Left qname
+        ValueSpace -> Right qname
   where
-    qNameNotInScope :: NameSpacedQName -> Maybe NameSpacedQName
-    qNameNotInScope x@(_, qname) = case ann qname of
-        ScopeError _ (ENotInScope _) -> Just x
-        _                            -> Nothing
+    qNameNotInScope :: QName (Scoped SrcSpan) -> Bool
+    qNameNotInScope qname = case ann qname of
+        ScopeError _ (ENotInScope _) -> True
+        _                            -> False
 
-    namesFromAST = everything (++) $ mkQ [] $
-               namesFromAsst
+    namesFromAST = everything (++) $
+        mkQ [] namesFromAsst
         `extQ` namesFromInstHead
         `extQ` namesFromType
         `extQ` namesFromExp
         `extQ` namesFromFieldUpdate
-
 
 namesFromAsst :: Asst l -> [(NameSpace, QName l)]
 namesFromAsst x = case x of
