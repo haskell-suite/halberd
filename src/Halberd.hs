@@ -3,20 +3,15 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TupleSections        #-}
 
-import           Debug.Trace
-
 import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad
 import           Data.Function
-import           Data.Generics
 import           Data.List
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Ord
-import           Data.Proxy
 import           Data.Set                            (Set)
 import qualified Data.Set                            as Set
 import           Distribution.HaskellSuite.Helpers
@@ -25,20 +20,21 @@ import qualified Distribution.InstalledPackageInfo   as Cabal
 import qualified Distribution.ModuleName             as Cabal
 import qualified Distribution.Package                as Cabal
 import           Distribution.Simple.Compiler
+import qualified Distribution.Text                   as Cabal
 import           Language.Haskell.Exts.Annotated
 import           Language.Haskell.Modules
 import           Language.Haskell.Modules.Imports    ()
 import           Language.Haskell.Modules.Interfaces
 import           System.FilePath
-import           Text.Show.Pretty
 
 import           Halberd.CollectNames                (collectUnboundNames)
 
+main :: IO ()
 main =
   do (ParseOk module_) <- parseFile "test.hs"
      pkgs <- concat <$> mapM (toolGetInstalledPkgs theTool) [UserPackageDB, GlobalPackageDB]
      bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
-     putStrLn (ppShow bla)
+     putStrLn bla
 
 type CanonicalSymbol a = (PackageRef, Cabal.ModuleName, a OrigName)
 
@@ -48,13 +44,15 @@ data PackageRef = PackageRef
   } deriving (Eq, Ord, Show)
 
 toPackageRef :: Cabal.InstalledPackageInfo_ m -> PackageRef
-toPackageRef pi = PackageRef (Cabal.installedPackageId pi) (Cabal.sourcePackageId pi)
+toPackageRef pkgInfo =
+    PackageRef (Cabal.installedPackageId pkgInfo)
+               (Cabal.sourcePackageId pkgInfo)
 
+suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO String
 suggestedImports module_ =
   do pkgs <- getPackages
      [(annSrc, _)] <- analyseModules [fmap srcInfoSpan module_]
-     let x@(typeNames, valueNames) = collectUnboundNames annSrc
-     trace (show x) $ do
+     let (typeNames, valueNames) = collectUnboundNames annSrc
      (valueDefs, typeDefs) <-
        fmap mconcat $ forM pkgs $ \pkg ->
          fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
@@ -62,19 +60,50 @@ suggestedImports module_ =
             return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
      let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
          typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
-         names      = mapMaybe unQName valueNames
-     return (map (flip Map.lookup valueTable) names)
+     return $ (unlines $ nub $ map (toImportStatements "value" valueTable) valueNames)
+              ++ (unlines $ nub $ map (toImportStatements "type" typeTable) typeNames)
+  where
+    trd (_, _, z)        = z
+    gUnqual (GName _ n)  = n
 
-gUnqual (GName _ name) = name
 
-trd (_, _, z) = z
 
-unQName (Qual    _ _ name) = Just (strName name)
-unQName (UnQual  _   name) = Just (strName name)
-unQName (Special _ _     ) = Nothing
 
-strName (Ident  _ str) = str
-strName (Symbol _ str) = str
+toImportStatements :: String
+                   -> Map String [(CanonicalSymbol a)]
+                   -> QName (Scoped SrcSpan)
+                   -> String
+toImportStatements nameSpace symbolTable qname = unlines $ case definitions of
+    Nothing   -> ["-- Could not find " ++ nameSpace ++ ": " ++ prettyPrint qname]
+    Just defs -> map mkImport defs
+  where
+    definitions = do
+        n <- unQName qname
+        Map.lookup n symbolTable
+
+    mkImport (_, moduleName, _) = case qname of
+        Qual _ qualification _ -> intercalate " "
+          [ "import"
+          , "qualified"
+          , Cabal.display moduleName
+          , "as"
+          , prettyPrint qualification
+          ]
+        UnQual _ n -> intercalate " "
+          [ "import"
+          , Cabal.display moduleName
+          , "("
+          , prettyPrint n
+          , ")"
+          ]
+        Special _ _ -> error "impossible: toImportStatements"
+
+    unQName (Qual    _ _ n) = Just (strName n)
+    unQName (UnQual  _   n) = Just (strName n)
+    unQName (Special _ _  ) = Nothing
+
+    strName (Ident  _ str)  = str
+    strName (Symbol _ str)  = str
 
 
 toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
@@ -85,22 +114,15 @@ toLookupTable key = Map.fromList
                   . map (key &&& id)
                   . Set.toList
 
-{-
-     Suggestion = (Packages, Module, Name)
 
-     [(Name, Suggestion)]
-
-     Map Name [Suggestion]
-
-     Map UnboundName [Suggestion]
-     -}
+-- Copied from 'gen-iface.hs' in haskell-names
 
 
 -- This function says how we actually find and read the module
 -- information, given the search path and the module name
 retrieveModuleInfo :: [FilePath] -> Cabal.ModuleName -> IO Symbols
-retrieveModuleInfo dirs name = do
-  (base, rel) <- findModuleFile dirs [suffix] name
+retrieveModuleInfo dirs n = do
+  (base, rel) <- findModuleFile dirs [suffix] n
   readInterface $ base </> rel
 
 theTool :: SimpleTool
@@ -113,5 +135,6 @@ theTool =
     undefined
     [suffix]
 
+suffix :: String
 suffix = "names"
 

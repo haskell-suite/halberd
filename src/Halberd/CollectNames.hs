@@ -4,11 +4,7 @@ module Halberd.CollectNames
 
 import           Control.Monad
 import           Data.Either
-import           Data.Function
 import           Data.Generics
-import           Data.List
-import           Data.Maybe
-import           Data.Ord
 import           Language.Haskell.Exts.Annotated        (SrcSpan)
 import           Language.Haskell.Exts.Annotated.Syntax
 import           Language.Haskell.Modules
@@ -19,9 +15,6 @@ import           Language.Haskell.Modules
 
 data NameSpace = TypeSpace | ValueSpace  -- DON'T CHANGE THE ORDER
     deriving (Eq, Ord, Show)
-
-type NameSpacedQName = (NameSpace, QName (Scoped SrcSpan))
-
 
 collectUnboundNames :: Module (Scoped SrcSpan)
                     -> ([QName (Scoped SrcSpan)], [QName (Scoped SrcSpan)])
