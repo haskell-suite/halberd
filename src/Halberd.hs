@@ -2,6 +2,9 @@
 {-# LANGUAGE ImplicitParams       #-}
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TupleSections        #-}
+
+import           Debug.Trace
+
 import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad
@@ -29,6 +32,8 @@ import           Language.Haskell.Modules.Interfaces
 import           System.FilePath
 import           Text.Show.Pretty
 
+import           Halberd.CollectNames                (collectUnboundNames)
+
 main =
   do (ParseOk module_) <- parseFile "test.hs"
      pkgs <- concat <$> mapM (toolGetInstalledPkgs theTool) [UserPackageDB, GlobalPackageDB]
@@ -48,7 +53,8 @@ toPackageRef pi = PackageRef (Cabal.installedPackageId pi) (Cabal.sourcePackageI
 suggestedImports module_ =
   do pkgs <- getPackages
      [(annSrc, _)] <- analyseModules [fmap srcInfoSpan module_]
-     let qnames = collectQNamesNotInScope annSrc
+     let (_, qnames) = unzip $ collectUnboundNames annSrc
+     trace (show qnames) (return ())
      (valueDefs, typeDefs) <-
        fmap mconcat $ forM pkgs $ \pkg ->
          fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
@@ -56,7 +62,7 @@ suggestedImports module_ =
             return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
      let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
          typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
-         names      = mapMaybe unQName . Set.toList $ qnames
+         names      = mapMaybe unQName qnames
      return (map (flip Map.lookup valueTable) names)
 
 gUnqual (GName _ name) = name
@@ -89,15 +95,6 @@ toLookupTable key = Map.fromList
      Map UnboundName [Suggestion]
      -}
 
-collectQNamesNotInScope :: Module (Scoped SrcSpan) -> Set (QName (Scoped SrcSpan))
-collectQNamesNotInScope = everything Set.union (mkQ Set.empty qNameNotInScope)
-
-
-qNameNotInScope :: QName (Scoped SrcSpan) -> Set (QName (Scoped SrcSpan))
-qNameNotInScope qname =
-  case ann qname of
-    ScopeError _ (ENotInScope _) -> Set.singleton qname
-    _                            -> Set.empty
 
 -- This function says how we actually find and read the module
 -- information, given the search path and the module name
@@ -117,3 +114,4 @@ theTool =
     [suffix]
 
 suffix = "names"
+
