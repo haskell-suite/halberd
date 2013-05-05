@@ -1,34 +1,33 @@
-{-# LANGUAGE ImplicitParams
-           , OverlappingInstances
-           , FlexibleInstances
-           , TupleSections
-           #-}
-import Control.Applicative
-import Control.Arrow
-import Control.Monad
-import Data.Function
-import Data.Generics
-import Data.List
-import Data.Maybe
-import Data.Monoid
-import Data.Ord
-import Data.Proxy
-import Data.Set (Set)
-import Data.Map (Map)
-import Distribution.HaskellSuite.Helpers
-import Distribution.HaskellSuite.Tool
-import Distribution.Simple.Compiler
-import Language.Haskell.Exts.Annotated
-import Language.Haskell.Modules
-import Language.Haskell.Modules.Imports ()
-import Language.Haskell.Modules.Interfaces
-import System.FilePath
-import Text.Show.Pretty
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Distribution.InstalledPackageInfo as Cabal
-import qualified Distribution.ModuleName           as Cabal
-import qualified Distribution.Package              as Cabal
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ImplicitParams       #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE TupleSections        #-}
+import           Control.Applicative
+import           Control.Arrow
+import           Control.Monad
+import           Data.Function
+import           Data.Generics
+import           Data.List
+import           Data.Map                            (Map)
+import qualified Data.Map                            as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Ord
+import           Data.Proxy
+import           Data.Set                            (Set)
+import qualified Data.Set                            as Set
+import           Distribution.HaskellSuite.Helpers
+import           Distribution.HaskellSuite.Tool
+import qualified Distribution.InstalledPackageInfo   as Cabal
+import qualified Distribution.ModuleName             as Cabal
+import qualified Distribution.Package                as Cabal
+import           Distribution.Simple.Compiler
+import           Language.Haskell.Exts.Annotated
+import           Language.Haskell.Modules
+import           Language.Haskell.Modules.Imports    ()
+import           Language.Haskell.Modules.Interfaces
+import           System.FilePath
+import           Text.Show.Pretty
 
 main =
   do (ParseOk module_) <- parseFile "test.hs"
