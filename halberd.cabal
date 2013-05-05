@@ -9,7 +9,7 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 executable halberd
-  build-depends:       base ==4.5.*
+  build-depends:       base >= 4.5 && < 4.7
                      , containers
                      , haskell-packages
                      , haskell-names
@@ -17,5 +17,7 @@ executable halberd
                      , Cabal >= 1.17
                      , filepath
                      , pretty-show
+                     , tagged
+                     , syb
   hs-source-dirs:      src
   main-is:             Halberd.hs

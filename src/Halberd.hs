@@ -1,23 +1,108 @@
+{-# LANGUAGE ImplicitParams
+           , OverlappingInstances
+           , FlexibleInstances
+           , TupleSections
+           #-}
 import Control.Applicative
+import Control.Arrow
+import Control.Monad
+import Data.Function
+import Data.Generics
+import Data.List
+import Data.Maybe
+import Data.Monoid
+import Data.Ord
+import Data.Proxy
+import Data.Set (Set)
+import Data.Map (Map)
 import Distribution.HaskellSuite.Helpers
 import Distribution.HaskellSuite.Tool
 import Distribution.Simple.Compiler
 import Language.Haskell.Exts.Annotated
 import Language.Haskell.Modules
+import Language.Haskell.Modules.Imports ()
 import Language.Haskell.Modules.Interfaces
-import qualified Data.Map as Map
 import System.FilePath
 import Text.Show.Pretty
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Distribution.InstalledPackageInfo as Cabal
+import qualified Distribution.ModuleName           as Cabal
+import qualified Distribution.Package              as Cabal
 
 main =
-  do (ParseOk mod) <- parseFile "test.hs"
+  do (ParseOk module_) <- parseFile "test.hs"
      pkgs <- concat <$> mapM (toolGetInstalledPkgs theTool) [UserPackageDB, GlobalPackageDB]
-     info <- evalModuleT (analyseModules [fmap srcInfoSpan mod]) pkgs retrieveModuleInfo Map.empty
-     putStrLn (ppShow info)
+     bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
+     putStrLn (ppShow bla)
+
+type CanonicalSymbol a = (PackageRef, Cabal.ModuleName, a OrigName)
+
+data PackageRef = PackageRef
+  { installedPackageId :: Cabal.InstalledPackageId
+  , sourcePackageId    :: Cabal.PackageId
+  } deriving (Eq, Ord, Show)
+
+toPackageRef :: Cabal.InstalledPackageInfo_ m -> PackageRef
+toPackageRef pi = PackageRef (Cabal.installedPackageId pi) (Cabal.sourcePackageId pi)
+
+suggestedImports module_ =
+  do pkgs <- getPackages
+     [(annSrc, _)] <- analyseModules [fmap srcInfoSpan module_]
+     let qnames = collectQNamesNotInScope annSrc
+     (valueDefs, typeDefs) <-
+       fmap mconcat $ forM pkgs $ \pkg ->
+         fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
+            (Symbols values types) <- readModuleInfo (Cabal.libraryDirs pkg) exposedModule
+            return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
+     let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
+         typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
+         names      = mapMaybe unQName . Set.toList $ qnames
+     return (map (flip Map.lookup valueTable) names)
+
+gUnqual (GName _ name) = name
+
+trd (_, _, z) = z
+
+unQName (Qual    _ _ name) = Just (strName name)
+unQName (UnQual  _   name) = Just (strName name)
+unQName (Special _ _     ) = Nothing
+
+strName (Ident  _ str) = str
+strName (Symbol _ str) = str
+
+
+toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
+toLookupTable key = Map.fromList
+                  . map (fst . head &&& map snd)
+                  . groupBy ((==) `on` fst)
+                  . sortBy (comparing fst)
+                  . map (key &&& id)
+                  . Set.toList
+
+{-
+     Suggestion = (Packages, Module, Name)
+
+     [(Name, Suggestion)]
+
+     Map Name [Suggestion]
+
+     Map UnboundName [Suggestion]
+     -}
+
+collectQNamesNotInScope :: Module (Scoped SrcSpan) -> Set (QName (Scoped SrcSpan))
+collectQNamesNotInScope = everything Set.union (mkQ Set.empty qNameNotInScope)
+
+
+qNameNotInScope :: QName (Scoped SrcSpan) -> Set (QName (Scoped SrcSpan))
+qNameNotInScope qname =
+  case ann qname of
+    ScopeError _ (ENotInScope _) -> Set.singleton qname
+    _                            -> Set.empty
 
 -- This function says how we actually find and read the module
 -- information, given the search path and the module name
--- retrieveModuleInfo :: [FilePath] -> ModuleName -> IO Symbols
+retrieveModuleInfo :: [FilePath] -> Cabal.ModuleName -> IO Symbols
 retrieveModuleInfo dirs name = do
   (base, rel) <- findModuleFile dirs [suffix] name
   readInterface $ base </> rel
