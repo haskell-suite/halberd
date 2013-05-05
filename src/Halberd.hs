@@ -21,6 +21,7 @@ import           Data.Set                            (Set)
 import qualified Data.Set                            as Set
 import           Distribution.HaskellSuite.Helpers
 import           Distribution.HaskellSuite.Tool
+import           Distribution.HaskellSuite.PackageDB
 import qualified Distribution.InstalledPackageInfo   as Cabal
 import qualified Distribution.ModuleName             as Cabal
 import qualified Distribution.Package                as Cabal
@@ -36,7 +37,10 @@ import           Halberd.CollectNames                (collectUnboundNames)
 
 main =
   do (ParseOk module_) <- parseFile "test.hs"
-     pkgs <- concat <$> mapM (toolGetInstalledPkgs theTool) [UserPackageDB, GlobalPackageDB]
+     pkgs <- concat <$>
+       mapM
+         (getInstalledPackages Don'tInitDB (Proxy :: Proxy NamesDB))
+         [UserPackageDB, GlobalPackageDB]
      bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
      putStrLn (ppShow bla)
 
@@ -103,15 +107,4 @@ retrieveModuleInfo dirs name = do
   (base, rel) <- findModuleFile dirs [suffix] name
   readInterface $ base </> rel
 
-theTool :: SimpleTool
-theTool =
-  simpleTool
-    "haskell-modules"
-    undefined
-    knownExtensions
-    (return Nothing)
-    undefined
-    [suffix]
-
 suffix = "names"
-
