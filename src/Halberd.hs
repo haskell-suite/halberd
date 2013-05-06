@@ -26,19 +26,27 @@ import           Language.Haskell.Exts.Annotated
 import           Language.Haskell.Modules
 import           Language.Haskell.Modules.Imports    ()
 import           Language.Haskell.Modules.Interfaces
+import           System.Environment
+import           System.Exit
 import           System.FilePath
 
 import           Halberd.CollectNames                (collectUnboundNames)
 
 main :: IO ()
 main =
-  do (ParseOk module_) <- parseFile "test.hs"
-     pkgs <- concat <$>
-       mapM
-         (getInstalledPackages Don'tInitDB (Proxy :: Proxy NamesDB))
-         [UserPackageDB, GlobalPackageDB]
-     bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
-     putStrLn bla
+  do args <- getArgs
+     case args of
+       [] -> do
+         putStrLn "Usage: halberd <SOURCEFILE>"
+         exitFailure
+       (fileName:_) -> do
+         (ParseOk module_) <- parseFile "test.hs"
+         pkgs <- concat <$>
+           mapM
+             (getInstalledPackages Don'tInitDB (Proxy :: Proxy NamesDB))
+             [UserPackageDB, GlobalPackageDB]
+         bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
+         putStrLn bla
 
 type CanonicalSymbol a = (PackageRef, Cabal.ModuleName, a OrigName)
 
