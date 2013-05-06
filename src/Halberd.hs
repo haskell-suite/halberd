@@ -12,10 +12,11 @@ import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
 import           Data.Monoid
 import           Data.Ord
+import           Data.Proxy
 import           Data.Set                            (Set)
 import qualified Data.Set                            as Set
 import           Distribution.HaskellSuite.Helpers
-import           Distribution.HaskellSuite.Tool
+import           Distribution.HaskellSuite.PackageDB
 import qualified Distribution.InstalledPackageInfo   as Cabal
 import qualified Distribution.ModuleName             as Cabal
 import qualified Distribution.Package                as Cabal
@@ -32,7 +33,10 @@ import           Halberd.CollectNames                (collectUnboundNames)
 main :: IO ()
 main =
   do (ParseOk module_) <- parseFile "test.hs"
-     pkgs <- concat <$> mapM (toolGetInstalledPkgs theTool) [UserPackageDB, GlobalPackageDB]
+     pkgs <- concat <$>
+       mapM
+         (getInstalledPackages Don'tInitDB (Proxy :: Proxy NamesDB))
+         [UserPackageDB, GlobalPackageDB]
      bla <- evalModuleT (suggestedImports module_) pkgs retrieveModuleInfo Map.empty
      putStrLn bla
 
@@ -115,26 +119,11 @@ toLookupTable key = Map.fromList
                   . Set.toList
 
 
--- Copied from 'gen-iface.hs' in haskell-names
-
-
 -- This function says how we actually find and read the module
 -- information, given the search path and the module name
 retrieveModuleInfo :: [FilePath] -> Cabal.ModuleName -> IO Symbols
 retrieveModuleInfo dirs n = do
-  (base, rel) <- findModuleFile dirs [suffix] n
-  readInterface $ base </> rel
-
-theTool :: SimpleTool
-theTool =
-  simpleTool
-    "haskell-modules"
-    undefined
-    knownExtensions
-    (return Nothing)
-    undefined
-    [suffix]
-
-suffix :: String
-suffix = "names"
-
+    (base, rel) <- findModuleFile dirs [suffix] n
+    readInterface $ base </> rel
+  where
+    suffix = "names"
