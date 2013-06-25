@@ -22,9 +22,9 @@ import qualified Distribution.Package                as Cabal
 import           Distribution.Simple.Compiler
 import qualified Distribution.Text                   as Cabal
 import           Language.Haskell.Exts.Annotated
-import           Language.Haskell.Modules
-import           Language.Haskell.Modules.Imports    ()
-import           Language.Haskell.Modules.Interfaces
+import           Language.Haskell.Names
+import           Language.Haskell.Names.Imports      ()
+import           Language.Haskell.Names.Interfaces
 import           System.Environment
 import           System.Exit
 import           System.FilePath
@@ -42,7 +42,7 @@ main =
          (ParseOk module_) <- parseFile "test.hs"
          pkgs <- concat <$>
            mapM
-             (getInstalledPackages Don'tInitDB (Proxy :: Proxy NamesDB))
+             (getInstalledPackages (Proxy :: Proxy NamesDB))
              [UserPackageDB, GlobalPackageDB]
          bla <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
          putStrLn bla
@@ -64,7 +64,7 @@ toPackageRef pkgInfo =
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO String
 suggestedImports module_ =
   do pkgs <- getPackages
-     [(annSrc, _)] <- analyseModules [fmap srcInfoSpan module_]
+     annSrc <- annotateModule Haskell98 [] (fmap srcInfoSpan module_)
      let (typeNames, valueNames) = collectUnboundNames annSrc
      (valueDefs, typeDefs) <-
        fmap mconcat $ forM pkgs $ \pkg ->
@@ -77,7 +77,7 @@ suggestedImports module_ =
               ++ (unlines $ nub $ map (toImportStatements "type" typeTable) typeNames)
   where
     trd (_, _, z)        = z
-    gUnqual (GName _ n)  = n
+    gUnqual (OrigName _ (GName _ n))  = n
 
 
 

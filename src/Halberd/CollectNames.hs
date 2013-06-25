@@ -7,7 +7,7 @@ import           Data.Either
 import           Data.Generics
 import           Language.Haskell.Exts.Annotated        (SrcSpan)
 import           Language.Haskell.Exts.Annotated.Syntax
-import           Language.Haskell.Modules
+import           Language.Haskell.Names
 
 ------------------------------------------------------------------------------
 -- Collecting the (unbound) names
@@ -27,8 +27,8 @@ collectUnboundNames module_ = partitionEithers $ do
   where
     qNameNotInScope :: QName (Scoped SrcSpan) -> Bool
     qNameNotInScope qname = case ann qname of
-        ScopeError _ (ENotInScope _) -> True
-        _                            -> False
+        Scoped (ScopeError ENotInScope {}) _ -> True
+        _                                    -> False
 
     namesFromAST = everything (++) $
         mkQ [] namesFromAsst
