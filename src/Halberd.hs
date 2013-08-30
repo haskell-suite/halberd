@@ -27,7 +27,6 @@ import           Language.Haskell.Names.Imports      ()
 import           Language.Haskell.Names.Interfaces
 import           System.Environment
 import           System.Exit
-import           System.FilePath
 
 import           Halberd.CollectNames                (collectUnboundNames)
 
