@@ -38,7 +38,7 @@ main =
          putStrLn "Usage: halberd <SOURCEFILE>"
          exitFailure
        (fileName:_) -> do
-         (ParseOk module_) <- parseFile "test.hs"
+         (ParseOk module_) <- parseFile fileName
          pkgs <- concat <$>
            mapM
              (getInstalledPackages (Proxy :: Proxy NamesDB))
