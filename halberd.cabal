@@ -21,3 +21,4 @@ executable halberd
                      , syb
   hs-source-dirs:      src
   main-is:             Halberd.hs
+  ghc-options:         -Wall
