@@ -37,8 +37,8 @@ main =
        [] -> do
          putStrLn "Usage: halberd <SOURCEFILE>"
          exitFailure
-       (fileName:_) -> do
-         (ParseOk module_) <- parseFile fileName
+       (file:_) -> do
+         (ParseOk module_) <- parseFile file
          pkgs <- concat <$>
            mapM
              (getInstalledPackages (Proxy :: Proxy NamesDB))
@@ -57,8 +57,9 @@ data PackageRef = PackageRef
 
 toPackageRef :: Cabal.InstalledPackageInfo_ m -> PackageRef
 toPackageRef pkgInfo =
-    PackageRef (Cabal.installedPackageId pkgInfo)
-               (Cabal.sourcePackageId pkgInfo)
+    PackageRef { installedPackageId = Cabal.installedPackageId pkgInfo
+               , sourcePackageId    = Cabal.sourcePackageId    pkgInfo
+               }
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO String
 suggestedImports module_ =
