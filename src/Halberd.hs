@@ -26,8 +26,10 @@ import           Language.Haskell.Exts.Annotated
 import           Language.Haskell.Names
 import           Language.Haskell.Names.Imports      ()
 import           Language.Haskell.Names.Interfaces
+import           Safe
 import           System.Environment
 import           System.Exit
+import           System.IO
 
 import           Halberd.CollectNames                (collectUnboundNames)
 
@@ -44,10 +46,53 @@ main =
            mapM
              (getInstalledPackages (Proxy :: Proxy NamesDB))
              [UserPackageDB, GlobalPackageDB]
-         bla <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
-         putStrLn bla
+         (valueSuggestions, typeSuggestions) <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
+         valueChoices <- askUserChoices $ filter (not . null . snd) valueSuggestions
+         typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
+         let imports = map (uncurry mkImport) valueChoices ++ map (uncurry mkImport) typeChoices
+         putStrLn $ unlines imports
   where
     suffix = "names"
+
+type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
+
+suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO ([Suggestion SymValueInfo], [Suggestion SymTypeInfo])
+suggestedImports module_ =
+  do (unboundTypes, unboundValues) <- findUnbound module_
+     (valueTable, typeTable) <- mkLookupTables
+     let valueSuggestions = map (id &&& lookupDefinitions valueTable) unboundValues
+         typeSuggestions  = map (id &&& lookupDefinitions typeTable ) unboundTypes
+     return (valueSuggestions, typeSuggestions)
+
+askUserChoices :: [(QName (Scoped SrcSpan), [CanonicalSymbol a])] -> IO [(QName (Scoped SrcSpan), CanonicalSymbol a)]
+askUserChoices suggestions = forM suggestions $ \(qname, modules) ->
+  do choice <- askUserChoice qname modules
+     return (qname, choice)
+
+askUserChoice :: QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> IO (CanonicalSymbol a)
+askUserChoice qname suggestions =
+  do putStrLn $ prettyPrint qname ++ ":"
+     forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, moduleName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display moduleName
+     getChoice suggestions
+
+getChoice :: [a] -> IO a
+getChoice xs = withoutOutput go
+  where
+    go =
+      do c <- getChar
+         let mi = readMay [c]
+         case (subtract 1) <$> mi >>= atMay xs of
+           Nothing -> go
+           Just x  -> return x
+    withoutOutput action =
+      do buffering <- hGetBuffering stdin
+         echo <- hGetEcho stdout
+         hSetBuffering stdin NoBuffering
+         hSetEcho stdout False
+         result <- action
+         hSetBuffering stdin buffering
+         hSetEcho stdout echo
+         return result
 
 type CanonicalSymbol a = (PackageRef, Cabal.ModuleName, a OrigName)
 
@@ -62,11 +107,14 @@ toPackageRef pkgInfo =
                , sourcePackageId    = Cabal.sourcePackageId    pkgInfo
                }
 
-suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO String
-suggestedImports module_ =
+findUnbound :: Module SrcSpanInfo -> ModuleT Symbols IO ([QName (Scoped SrcSpan)], [QName (Scoped SrcSpan)])
+findUnbound module_ = collectUnboundNames <$> annotateModule Haskell98 [] (fmap srcInfoSpan module_)
+
+type LookupTable a = Map String [CanonicalSymbol a]
+
+mkLookupTables :: ModuleT Symbols IO (LookupTable SymValueInfo, LookupTable SymTypeInfo)
+mkLookupTables =
   do pkgs <- getPackages
-     annSrc <- annotateModule Haskell98 [] (fmap srcInfoSpan module_)
-     let (typeNames, valueNames) = collectUnboundNames annSrc
      (valueDefs, typeDefs) <-
        fmap mconcat $ forM pkgs $ \pkg ->
          fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
@@ -74,8 +122,7 @@ suggestedImports module_ =
             return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
      let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
          typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
-     return $ (unlines $ nub $ map (toImportStatements "value" valueTable) valueNames)
-              ++ (unlines $ nub $ map (toImportStatements "type" typeTable) typeNames)
+     return (valueTable, typeTable)
   where
     trd (_, _, z)        = z
     gUnqual (OrigName _ (GName _ n))  = n
@@ -113,15 +160,6 @@ mkImport qname (_, moduleName, _) =
       ]
     Special _ _ -> error "impossible: toImportStatements"
 
-toImportStatements :: Show (a OrigName) => String
-                   -> Map String [(CanonicalSymbol a)]
-                   -> QName (Scoped SrcSpan)
-                   -> String
-toImportStatements nameSpace symbolTable qname = unlines $ case lookupDefinitions symbolTable qname of
-    []   -> ["-- Could not find " ++ nameSpace ++ ": " ++ prettyPrint qname]
-    defs -> map (mkImport qname) defs
-
-
 toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
 toLookupTable key = Map.fromList
                   . map (fst . head &&& map snd)
@@ -129,3 +167,4 @@ toLookupTable key = Map.fromList
                   . sortBy (comparing fst)
                   . map (key &&& id)
                   . Set.toList
+
