@@ -58,11 +58,14 @@ type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO ([Suggestion SymValueInfo], [Suggestion SymTypeInfo])
 suggestedImports module_ =
-  do (unboundTypes, unboundValues) <- findUnbound module_
+  do (unboundTypes, unboundValues) <- uniques <$> findUnbound module_
      (valueTable, typeTable) <- mkLookupTables
      let valueSuggestions = map (id &&& lookupDefinitions valueTable) unboundValues
          typeSuggestions  = map (id &&& lookupDefinitions typeTable ) unboundTypes
      return (valueSuggestions, typeSuggestions)
+  where
+    uniques = unique *** unique
+    unique = nubBy ((==) `on` void)
 
 askUserChoices :: [(QName (Scoped SrcSpan), [CanonicalSymbol a])] -> IO [(QName (Scoped SrcSpan), CanonicalSymbol a)]
 askUserChoices suggestions = forM suggestions $ \(qname, modules) ->
