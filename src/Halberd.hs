@@ -55,6 +55,9 @@ main =
            typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
            return (valueChoices, typeChoices)
          let imports = map (uncurry mkImport) valueChoices ++ map (uncurry mkImport) typeChoices
+
+         putStrLn "---------- Insert these imports into your file ----------"
+         putStrLn ""
          putStrLn $ unlines imports
   where
     suffix = "names"
@@ -97,6 +100,7 @@ askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> m
 askUserChoice qname suggestions = liftIO $
   do putStrLn $ prettyPrint qname ++ ":"
      forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, moduleName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display moduleName
+     putStrLn ""
      getChoice suggestions
 
 getChoice :: [a] -> IO a
