@@ -54,17 +54,35 @@ main =
            valueChoices <- askUserChoices $ filter (not . null . snd) valueSuggestions
            typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
            return (valueChoices, typeChoices)
-         let imports = map (uncurry mkImport) valueChoices ++ map (uncurry mkImport) typeChoices
+         let allImports = map (uncurry toImport) valueChoices ++ map (uncurry toImport) typeChoices
+         let imports = mergeExplicitImports allImports
 
          putStrLn "---------- Insert these imports into your file ----------"
          putStrLn ""
-         putStrLn $ unlines imports
+         putStrLn $ unlines (map showImport imports)
   where
     suffix = "names"
 
 type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
 type Choice a = (QName (Scoped SrcSpan), CanonicalSymbol a)
 type ChosenImports = Map (ModuleName ()) Cabal.ModuleName
+
+data Import = Qualified (ModuleName ()) Cabal.ModuleName
+            | Explicit Cabal.ModuleName [Name ()]
+
+moduleName :: Import -> Cabal.ModuleName
+moduleName (Qualified _ n) = n
+moduleName (Explicit n _)  = n
+
+isExplicit :: Import -> Bool
+isExplicit Explicit{} = True
+isExplicit _          = False
+
+mergeExplicitImports :: [Import] -> [Import]
+mergeExplicitImports ims = foldr merge [] $ sortBy (comparing $ isExplicit &&& moduleName) ims
+  where
+    merge (Explicit m1 nms1) (Explicit m2 nms2 : is) | m1 == m2 = Explicit m1 (nms1 ++ nms2) : is
+    merge i                 is                                  = i : is
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO ([Suggestion SymValueInfo], [Suggestion SymTypeInfo])
 suggestedImports module_ =
@@ -100,7 +118,7 @@ askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> m
 askUserChoice _     [suggestion] = return suggestion
 askUserChoice qname suggestions  = liftIO $
   do putStrLn $ prettyPrint qname ++ ":"
-     forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, moduleName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display moduleName
+     forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, modName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display modName
      putStrLn ""
      getChoice suggestions
 
@@ -170,24 +188,31 @@ lookupDefinitions symbolTable qname = fromMaybe [] $
     strName (Symbol _ str)  = str
 
 
-mkImport :: QName a -> CanonicalSymbol b -> String
-mkImport qname (_, moduleName, _) =
+toImport :: QName a -> CanonicalSymbol b -> Import
+toImport qname (_, modName, _) =
   case qname of
-    Qual _ qualification _ -> intercalate " "
+    Qual _ qualification _ -> Qualified (void qualification) modName
+    UnQual _ nm            -> Explicit modName [void nm]
+    Special _ _            -> error "impossible: toImport"
+
+
+showImport :: Import -> String
+showImport (Qualified qualification modName) =
+    intercalate " "
       [ "import"
       , "qualified"
-      , Cabal.display moduleName
+      , Cabal.display modName
       , "as"
       , prettyPrint qualification
       ]
-    UnQual _ n -> intercalate " "
+showImport (Explicit modName names) =
+    intercalate " "
       [ "import"
-      , Cabal.display moduleName
+      , Cabal.display modName
       , "("
-      , prettyPrint n
+      ,  intercalate ", " $ map prettyPrint names
       , ")"
       ]
-    Special _ _ -> error "impossible: toImportStatements"
 
 toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
 toLookupTable key = Map.fromList
