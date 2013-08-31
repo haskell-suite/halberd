@@ -8,6 +8,7 @@ import           Control.Arrow
 import           Control.Monad
 import           Data.Function
 import           Data.List
+import           Data.Maybe
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
 import           Data.Monoid
@@ -80,43 +81,45 @@ suggestedImports module_ =
     gUnqual (OrigName _ (GName _ n))  = n
 
 
-
-
-toImportStatements :: String
-                   -> Map String [(CanonicalSymbol a)]
-                   -> QName (Scoped SrcSpan)
-                   -> String
-toImportStatements nameSpace symbolTable qname = unlines $ case definitions of
-    Nothing   -> ["-- Could not find " ++ nameSpace ++ ": " ++ prettyPrint qname]
-    Just defs -> map mkImport defs
+lookupDefinitions :: Map String [CanonicalSymbol a] -> QName (Scoped SrcSpan) -> [CanonicalSymbol a]
+lookupDefinitions symbolTable qname = fromMaybe [] $
+  do n <- unQName qname
+     Map.lookup n symbolTable
   where
-    definitions = do
-        n <- unQName qname
-        Map.lookup n symbolTable
-
-    mkImport (_, moduleName, _) = case qname of
-        Qual _ qualification _ -> intercalate " "
-          [ "import"
-          , "qualified"
-          , Cabal.display moduleName
-          , "as"
-          , prettyPrint qualification
-          ]
-        UnQual _ n -> intercalate " "
-          [ "import"
-          , Cabal.display moduleName
-          , "("
-          , prettyPrint n
-          , ")"
-          ]
-        Special _ _ -> error "impossible: toImportStatements"
-
     unQName (Qual    _ _ n) = Just (strName n)
     unQName (UnQual  _   n) = Just (strName n)
     unQName (Special _ _  ) = Nothing
 
     strName (Ident  _ str)  = str
     strName (Symbol _ str)  = str
+
+
+mkImport :: QName a -> CanonicalSymbol b -> String
+mkImport qname (_, moduleName, _) =
+  case qname of
+    Qual _ qualification _ -> intercalate " "
+      [ "import"
+      , "qualified"
+      , Cabal.display moduleName
+      , "as"
+      , prettyPrint qualification
+      ]
+    UnQual _ n -> intercalate " "
+      [ "import"
+      , Cabal.display moduleName
+      , "("
+      , prettyPrint n
+      , ")"
+      ]
+    Special _ _ -> error "impossible: toImportStatements"
+
+toImportStatements :: Show (a OrigName) => String
+                   -> Map String [(CanonicalSymbol a)]
+                   -> QName (Scoped SrcSpan)
+                   -> String
+toImportStatements nameSpace symbolTable qname = unlines $ case lookupDefinitions symbolTable qname of
+    []   -> ["-- Could not find " ++ nameSpace ++ ": " ++ prettyPrint qname]
+    defs -> map (mkImport qname) defs
 
 
 toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
