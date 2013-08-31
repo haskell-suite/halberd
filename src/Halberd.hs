@@ -49,17 +49,29 @@ main =
            mapM
              (getInstalledPackages (Proxy :: Proxy NamesDB))
              [UserPackageDB, GlobalPackageDB]
-         (valueSuggestions, typeSuggestions) <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
+         (allValueSuggestions, allTypeSuggestions) <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
+
+         let (valueSuggestions, noValueSuggestions) = partition (not . null . snd) allValueSuggestions
+         let (typeSuggestions,  noTypeSuggestions)  = partition (not . null . snd) allTypeSuggestions
+         let noSuggestions = map fst noValueSuggestions ++ map fst noTypeSuggestions
+
          (valueChoices, typeChoices) <- flip evalStateT mempty $ do
-           valueChoices <- askUserChoices $ filter (not . null . snd) valueSuggestions
-           typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
+           valueChoices <- askUserChoices valueSuggestions
+           typeChoices <- askUserChoices typeSuggestions
            return (valueChoices, typeChoices)
          let allImports = map (uncurry toImport) valueChoices ++ map (uncurry toImport) typeChoices
          let imports = mergeExplicitImports allImports
 
-         putStrLn "---------- Insert these imports into your file ----------"
-         putStrLn ""
-         putStrLn $ unlines (map showImport imports)
+         when (not . null $ noSuggestions) $ do
+           putStrLn "------------- Could not find import for -------------"
+           forM_ noSuggestions $ \q -> do
+             putStrLn $ " - " ++ prettyPrint q
+           putStrLn ""
+
+         when (not . null $ imports) $ do
+           putStrLn "-------- Insert these imports into your file --------"
+           putStrLn ""
+           putStrLn $ unlines (map showImport imports)
   where
     suffix = "names"
 
