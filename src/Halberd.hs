@@ -2,10 +2,13 @@
 {-# LANGUAGE ImplicitParams       #-}
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE DoAndIfThenElse      #-}
 
 import           Control.Applicative
 import           Control.Arrow
-import           Control.Monad
+import           Control.Monad hiding (forM_)
+import           Control.Monad.State hiding (forM_)
+import           Data.Foldable (forM_)
 import           Data.Function
 import           Data.List
 import           Data.Maybe
@@ -47,14 +50,18 @@ main =
              (getInstalledPackages (Proxy :: Proxy NamesDB))
              [UserPackageDB, GlobalPackageDB]
          (valueSuggestions, typeSuggestions) <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
-         valueChoices <- askUserChoices $ filter (not . null . snd) valueSuggestions
-         typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
+         (valueChoices, typeChoices) <- flip evalStateT mempty $ do
+           valueChoices <- askUserChoices $ filter (not . null . snd) valueSuggestions
+           typeChoices <- askUserChoices $ filter (not . null . snd) typeSuggestions
+           return (valueChoices, typeChoices)
          let imports = map (uncurry mkImport) valueChoices ++ map (uncurry mkImport) typeChoices
          putStrLn $ unlines imports
   where
     suffix = "names"
 
 type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
+type Choice a = (QName (Scoped SrcSpan), CanonicalSymbol a)
+type ChosenImports = Map (ModuleName ()) Cabal.ModuleName
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO ([Suggestion SymValueInfo], [Suggestion SymTypeInfo])
 suggestedImports module_ =
@@ -67,13 +74,27 @@ suggestedImports module_ =
     uniques = unique *** unique
     unique = nubBy ((==) `on` void)
 
-askUserChoices :: [(QName (Scoped SrcSpan), [CanonicalSymbol a])] -> IO [(QName (Scoped SrcSpan), CanonicalSymbol a)]
-askUserChoices suggestions = forM suggestions $ \(qname, modules) ->
-  do choice <- askUserChoice qname modules
-     return (qname, choice)
+askUserChoices :: [Suggestion a] -> StateT ChosenImports IO [Choice a]
+askUserChoices suggestions = fmap catMaybes . forM suggestions $ \(qname, modules) ->
+  do chosenModules <- get
+     if alreadyChosen qname modules chosenModules
+     then
+       return Nothing
+     else do
+       choice <- askUserChoice qname modules
+       forM_ (getQualification qname) $ \qualification -> modify $ Map.insert qualification (snd3 choice)
+       return $ Just (qname, choice)
+  where
+    alreadyChosen qname modules chosenModules = fromMaybe False $
+      do q <- getQualification qname
+         module_ <- Map.lookup q chosenModules
+         return $ module_ `elem` map snd3 modules
+    snd3 (_, y, _) = y
+    getQualification (Qual _ q _) = Just $ void q
+    getQualification _            = Nothing
 
-askUserChoice :: QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> IO (CanonicalSymbol a)
-askUserChoice qname suggestions =
+askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> m (CanonicalSymbol a)
+askUserChoice qname suggestions = liftIO $
   do putStrLn $ prettyPrint qname ++ ":"
      forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, moduleName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display moduleName
      getChoice suggestions

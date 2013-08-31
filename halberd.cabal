@@ -16,6 +16,7 @@ executable halberd
                      , haskell-src-exts == 1.14.*
                      , Cabal >= 1.17 && < 1.19
                      , filepath
+                     , mtl
                      , pretty-show
                      , tagged
                      , safe
