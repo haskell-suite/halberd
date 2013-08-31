@@ -97,7 +97,8 @@ askUserChoices suggestions = fmap catMaybes . forM suggestions $ \(qname, module
     getQualification _            = Nothing
 
 askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> m (CanonicalSymbol a)
-askUserChoice qname suggestions = liftIO $
+askUserChoice _     [suggestion] = return suggestion
+askUserChoice qname suggestions  = liftIO $
   do putStrLn $ prettyPrint qname ++ ":"
      forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, moduleName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display moduleName
      putStrLn ""

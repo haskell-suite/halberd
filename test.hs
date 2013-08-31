@@ -8,3 +8,4 @@ main = do
 table :: M.Map String Int8
 table = M.fromList [("Odeca", 1), ("Hackathon",2)]
 
+f = liftM
