@@ -56,7 +56,7 @@ main =
 
          let (suggestions, noSuggestions) = partition (not . null . snd) allSuggestions
 
-         choices <- flip evalStateT mempty $ askUserChoices suggestions
+         choices <- askUserChoices suggestions
 
          let allImports = map (uncurry toImport . second snd3) choices
          let imports = mergeExplicitImports allImports
@@ -88,18 +88,30 @@ suggestedImports module_ =
     uniques = unique *** unique
     unique = nubBy ((==) `on` void)
 
-askUserChoices :: [Suggestion] -> StateT ChosenImports IO [Choice]
-askUserChoices suggestions = fmap catMaybes . forM suggestions $ \(qname, modules) ->
-  do chosenModules <- get
+askUserChoices :: [Suggestion] -> IO [Choice]
+askUserChoices suggestions = snd <$> execStateT (go suggestions) mempty
+  where
+    go sugs = do
+      remaining <- resolveSuggestions sugs
+      case remaining of
+        [] -> return []
+        ((qname, modules):ss) -> do
+          choice <- askUserChoice qname modules
+          modify $ insertChoice qname (snd3 choice) *** ((qname, choice):)
+          go ss
+
+resolveSuggestions :: [Suggestion] -> StateT (ChosenImports, [Choice]) IO [Suggestion]
+resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion@(qname, modules) ->
+  do chosenModules <- gets fst
      if alreadyChosen qname modules chosenModules
      then
        return Nothing
      else do
-       choice <- case hasSingleOption qname modules chosenModules of
-                   Just singleOption -> return singleOption
-                   Nothing           -> askUserChoice qname modules
-       modify $ insertChoice qname (snd3 choice)
-       return $ Just (qname, choice)
+       case hasSingleOption qname modules chosenModules of
+         Nothing           -> return $ Just suggestion
+         Just choice -> do
+           modify $ insertChoice qname (snd3 choice) *** ((qname, choice):)
+           return Nothing
   where
     alreadyChosen qname modules chosenModules = fromMaybe False $
       do q <- getQualification qname
