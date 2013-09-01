@@ -77,7 +77,41 @@ main =
 
 type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
 type Choice a = (QName (Scoped SrcSpan), CanonicalSymbol a)
-type ChosenImports = Map (ModuleName ()) Cabal.ModuleName
+data ChosenImports = ChosenImports
+  { qualifieds   :: Map (ModuleName ()) Cabal.ModuleName
+  , unqualifieds :: [Cabal.ModuleName]
+  }
+
+instance Monoid ChosenImports where
+  mempty = ChosenImports
+    { qualifieds   = mempty
+    , unqualifieds = mempty
+    }
+  i1 `mappend` i2 = ChosenImports
+    { qualifieds   = qualifieds   i1 `mappend`  qualifieds i2
+    , unqualifieds = unqualifieds i1 `mappend`  unqualifieds i2
+    }
+
+lookupQualified :: ModuleName () -> ChosenImports -> Maybe Cabal.ModuleName
+lookupQualified qualification = Map.lookup qualification . qualifieds
+
+insertQualified :: ModuleName () -> Cabal.ModuleName -> ChosenImports -> ChosenImports
+insertQualified qualification module_ chosenImports = chosenImports
+  { qualifieds = Map.insert qualification module_ (qualifieds chosenImports) }
+
+insertUnqualified :: Cabal.ModuleName -> ChosenImports -> ChosenImports
+insertUnqualified module_ chosenImports = chosenImports
+  { unqualifieds = module_ : unqualifieds chosenImports }
+
+insertChoice :: QName a -> Cabal.ModuleName -> ChosenImports -> ChosenImports
+insertChoice qname module_ =
+  case getQualification qname of
+    Just qualification -> insertQualified qualification module_
+    Nothing            -> insertUnqualified module_
+
+getQualification :: QName a -> Maybe (ModuleName ())
+getQualification (Qual _ q _) = Just $ void q
+getQualification _            = Nothing
 
 data Import = Qualified (ModuleName ()) Cabal.ModuleName
             | Explicit Cabal.ModuleName [Name ()]
@@ -107,27 +141,32 @@ suggestedImports module_ =
     uniques = unique *** unique
     unique = nubBy ((==) `on` void)
 
-askUserChoices :: [Suggestion a] -> StateT ChosenImports IO [Choice a]
+askUserChoices :: HasOrigName a => [Suggestion a] -> StateT ChosenImports IO [Choice a]
 askUserChoices suggestions = fmap catMaybes . forM suggestions $ \(qname, modules) ->
   do chosenModules <- get
      if alreadyChosen qname modules chosenModules
      then
        return Nothing
      else do
-       choice <- askUserChoice qname modules
-       forM_ (getQualification qname) $ \qualification -> modify $ Map.insert qualification (snd3 choice)
+       choice <- case hasSingleOption qname modules chosenModules of
+                   Just singleOption -> return singleOption
+                   Nothing           -> askUserChoice qname modules
+       modify $ insertChoice qname (snd3 choice)
        return $ Just (qname, choice)
   where
     alreadyChosen qname modules chosenModules = fromMaybe False $
       do q <- getQualification qname
-         module_ <- Map.lookup q chosenModules
+         module_ <- lookupQualified q chosenModules
          return $ module_ `elem` map snd3 modules
-    snd3 (_, y, _) = y
-    getQualification (Qual _ q _) = Just $ void q
-    getQualification _            = Nothing
+    hasSingleOption _        [module_] _             = Just module_
+    hasSingleOption UnQual{} modules   chosenModules | singleOrigName modules =
+      headMay $ filter ((`elem` unqualifieds chosenModules) . snd3) modules
+    hasSingleOption _        _         _             = Nothing
+    singleOrigName = allEqual . map (origName . trd3)
+    allEqual []     = True
+    allEqual (x:xs) = all (== x) xs
 
 askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol a] -> m (CanonicalSymbol a)
-askUserChoice _     [suggestion] = return suggestion
 askUserChoice qname suggestions  = liftIO $
   do putStrLn $ prettyPrint qname ++ ":"
      forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, modName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display modName
@@ -179,11 +218,10 @@ mkLookupTables =
          fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
             (Symbols values types) <- readModuleInfo (Cabal.libraryDirs pkg) exposedModule
             return (Set.map (toPackageRef pkg, exposedModule,) values, Set.map (toPackageRef pkg, exposedModule,) types)
-     let valueTable = toLookupTable (gUnqual . sv_origName . trd) valueDefs
-         typeTable  = toLookupTable (gUnqual . st_origName . trd) typeDefs
+     let valueTable = toLookupTable (gUnqual . sv_origName . trd3) valueDefs
+         typeTable  = toLookupTable (gUnqual . st_origName . trd3) typeDefs
      return (valueTable, typeTable)
   where
-    trd (_, _, z)        = z
     gUnqual (OrigName _ (GName _ n))  = n
 
 
@@ -234,3 +272,7 @@ toLookupTable key = Map.fromList
                   . map (key &&& id)
                   . Set.toList
 
+snd3 :: (a, b, c) -> b
+snd3 (_, y, _) = y
+trd3 :: (a, b, c) -> c
+trd3 (_, _, z) = z
