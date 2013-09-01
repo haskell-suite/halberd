@@ -22,7 +22,7 @@ executable halberd
   build-depends:       base             >= 4.5    &&  < 4.7
                      , containers       >= 0.4    &&  < 0.6
                      , haskell-packages == 0.2.*
-                     , haskell-names    == 0.1.*
+                     , haskell-names    == 0.2.*
                      , haskell-src-exts == 1.14.*
                      , Cabal            >= 1.17   &&  < 1.19
                      , filepath         == 1.3.*
