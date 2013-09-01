@@ -36,6 +36,7 @@ import           System.IO
 
 import           Halberd.ChosenImports
 import           Halberd.CollectNames                (collectUnboundNames)
+import           Halberd.Import
 import           Language.Haskell.Exts.Utils
 
 main :: IO ()
@@ -61,7 +62,7 @@ main =
            valueChoices <- askUserChoices valueSuggestions
            typeChoices <- askUserChoices typeSuggestions
            return (valueChoices, typeChoices)
-         let allImports = map (uncurry toImport) valueChoices ++ map (uncurry toImport) typeChoices
+         let allImports = map (uncurry toImport . second snd3) valueChoices ++ map (uncurry toImport . second snd3) typeChoices
          let imports = mergeExplicitImports allImports
 
          when (not . null $ noSuggestions) $ do
@@ -79,23 +80,6 @@ main =
 
 type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
 type Choice a = (QName (Scoped SrcSpan), CanonicalSymbol a)
-
-data Import = Qualified (ModuleName ()) Cabal.ModuleName
-            | Explicit Cabal.ModuleName [Name ()]
-
-moduleName :: Import -> Cabal.ModuleName
-moduleName (Qualified _ n) = n
-moduleName (Explicit n _)  = n
-
-isExplicit :: Import -> Bool
-isExplicit Explicit{} = True
-isExplicit _          = False
-
-mergeExplicitImports :: [Import] -> [Import]
-mergeExplicitImports ims = foldr merge [] $ sortBy (comparing $ isExplicit &&& moduleName) ims
-  where
-    merge (Explicit m1 nms1) (Explicit m2 nms2 : is) | m1 == m2 = Explicit m1 (nms1 ++ nms2) : is
-    merge i                 is                                  = i : is
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO ([Suggestion SymValueInfo], [Suggestion SymTypeInfo])
 suggestedImports module_ =
@@ -204,32 +188,6 @@ lookupDefinitions symbolTable qname = fromMaybe [] $
     strName (Ident  _ str)  = str
     strName (Symbol _ str)  = str
 
-
-toImport :: QName a -> CanonicalSymbol b -> Import
-toImport qname (_, modName, _) =
-  case qname of
-    Qual _ qualification _ -> Qualified (void qualification) modName
-    UnQual _ nm            -> Explicit modName [void nm]
-    Special _ _            -> error "impossible: toImport"
-
-
-showImport :: Import -> String
-showImport (Qualified qualification modName) =
-    intercalate " "
-      [ "import"
-      , "qualified"
-      , Cabal.display modName
-      , "as"
-      , prettyPrint qualification
-      ]
-showImport (Explicit modName names) =
-    intercalate " "
-      [ "import"
-      , Cabal.display modName
-      , "("
-      ,  intercalate ", " $ map prettyPrint names
-      , ")"
-      ]
 
 toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
 toLookupTable key = Map.fromList
