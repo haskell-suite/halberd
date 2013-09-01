@@ -50,7 +50,7 @@ main =
          pkgs <- concat <$>
            mapM
              (getInstalledPackages (Proxy :: Proxy NamesDB))
-             [UserPackageDB, GlobalPackageDB]
+             [UserPackageDB, GlobalPackageDB, SpecificPackageDB "/Users/erik/doc/haskell-suite/.cabal-sandbox/x86_64-osx-haskell-names-0.1-packages.conf.d"]
          allSuggestions <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
 
          let (suggestions, noSuggestions) = partition (not . null . snd) allSuggestions

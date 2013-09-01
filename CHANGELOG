@@ -1,2 +1,6 @@
+0.1.1:
+  * Include needed modules.
+  * Smarter, order-independent auto-choosing.
+
 0.1:
   * Initial release
