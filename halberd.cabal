@@ -16,7 +16,7 @@ description:         This tool uses <https://github.com/haskell-suite
                      interactive menu for you to choose from. See the
                      home page for more details.
 homepage:            http://github.com/haskell-suite/halberd/
-extra-source-files:  CHANGELOG
+extra-source-files:  CHANGELOG, README.md
 
 executable halberd
   build-depends:       base             >= 4.5    &&  < 4.7
