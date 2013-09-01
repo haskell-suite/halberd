@@ -2,11 +2,21 @@ name:                halberd
 version:             0.1
 license:             BSD3
 license-file:        LICENSE
-author:              Erik Hesselink
+author:              Erik Hesselink, Simon Meier, Tom Lokhorst, Roman Cheplyaka
 maintainer:          hesselink@gmail.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.8
+synopsis:            A tool to generate missing import statements for Haskell modules.
+description:         This tool uses <https://github.com/haskell-suite
+                     the Haskell Suite> to determine the unbound
+                     variables and types in your source code, and
+                     generate import statements for them. If there are
+                     multiple choices, it provides a simple
+                     interactive menu for you to choose from. See the
+                     home page for more details.
+homepage:            http://github.com/haskell-suite/halberd/
+extra-source-files:  CHANGELOG
 
 executable halberd
   build-depends:       base             >= 4.5    &&  < 4.7
@@ -23,3 +33,7 @@ executable halberd
   hs-source-dirs:      src
   main-is:             Halberd.hs
   ghc-options:         -Wall
+
+Source-Repository head
+  Type:                git
+  Location:            git://github.com/haskell-suite/halberd.git
