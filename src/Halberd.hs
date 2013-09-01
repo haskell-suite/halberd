@@ -36,7 +36,6 @@ import           System.IO
 
 import           Halberd.ChosenImports
 import           Halberd.CollectNames                (collectUnboundNames)
-import           Halberd.Import
 import           Language.Haskell.Exts.Utils
 
 main :: IO ()
@@ -56,10 +55,7 @@ main =
 
          let (suggestions, noSuggestions) = partition (not . null . snd) allSuggestions
 
-         choices <- askUserChoices suggestions
-
-         let allImports = map (uncurry toImport . second snd3) choices
-         let imports = mergeExplicitImports allImports
+         chosenImports <- askUserChoices suggestions
 
          when (not . null $ noSuggestions) $ do
            putStrLn "------------- Could not find import for -------------"
@@ -67,15 +63,14 @@ main =
              putStrLn $ " - " ++ prettyPrint q
            putStrLn ""
 
-         when (not . null $ imports) $ do
+         when (not . isEmpty $ chosenImports) $ do
            putStrLn "-------- Insert these imports into your file --------"
            putStrLn ""
-           putStrLn $ unlines (map showImport imports)
+           putStrLn $ unlines (showChosenImports chosenImports)
   where
     suffix = "names"
 
 type Suggestion = (QName (Scoped SrcSpan), [CanonicalSymbol])
-type Choice = (QName (Scoped SrcSpan), CanonicalSymbol)
 
 suggestedImports :: Module SrcSpanInfo -> ModuleT Symbols IO [Suggestion]
 suggestedImports module_ =
@@ -88,8 +83,8 @@ suggestedImports module_ =
     uniques = unique *** unique
     unique = nubBy ((==) `on` void)
 
-askUserChoices :: [Suggestion] -> IO [Choice]
-askUserChoices suggestions = snd <$> execStateT (go suggestions) mempty
+askUserChoices :: [Suggestion] -> IO ChosenImports
+askUserChoices suggestions = execStateT (go suggestions) mempty
   where
     go sugs = do
       remaining <- resolveSuggestions sugs
@@ -97,12 +92,12 @@ askUserChoices suggestions = snd <$> execStateT (go suggestions) mempty
         [] -> return []
         ((qname, modules):ss) -> do
           choice <- askUserChoice qname modules
-          modify $ insertChoice qname (snd3 choice) *** ((qname, choice):)
+          modify $ insertChoice qname (snd3 choice)
           go ss
 
-resolveSuggestions :: [Suggestion] -> StateT (ChosenImports, [Choice]) IO [Suggestion]
+resolveSuggestions :: [Suggestion] -> StateT ChosenImports IO [Suggestion]
 resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion@(qname, modules) ->
-  do chosenModules <- gets fst
+  do chosenModules <- get
      if alreadyChosen qname modules chosenModules
      then
        return Nothing
@@ -110,7 +105,7 @@ resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion
        case hasSingleOption qname modules chosenModules of
          Nothing           -> return $ Just suggestion
          Just choice -> do
-           modify $ insertChoice qname (snd3 choice) *** ((qname, choice):)
+           modify $ insertChoice qname (snd3 choice)
            return Nothing
   where
     alreadyChosen qname modules chosenModules = fromMaybe False $
@@ -119,7 +114,7 @@ resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion
          return $ module_ `elem` map snd3 modules
     hasSingleOption _        [module_] _             = Just module_
     hasSingleOption UnQual{} modules   chosenModules | singleOrigName modules =
-      headMay $ filter ((`elem` unqualifieds chosenModules) . snd3) modules
+      headMay $ filter ((`Map.member` unqualifieds chosenModules) . snd3) modules
     hasSingleOption _        _         _             = Nothing
     singleOrigName = allEqual . map trd3
     allEqual []     = True

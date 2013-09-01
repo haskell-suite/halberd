@@ -1,15 +1,17 @@
 module Halberd.ChosenImports where
 
-import Data.Map (Map)
+import Control.Monad
+import Data.List
+import Data.Map (Map, insertWith)
 import Data.Monoid
-import Language.Haskell.Exts.Annotated
-import Language.Haskell.Exts.Utils
+import Language.Haskell.Exts.Annotated hiding (name)
 import qualified Data.Map                as Map
 import qualified Distribution.ModuleName as Cabal
+import qualified Distribution.Text       as Cabal
 
 data ChosenImports = ChosenImports
   { qualifieds   :: Map (ModuleName ()) Cabal.ModuleName
-  , unqualifieds :: [Cabal.ModuleName]
+  , unqualifieds :: Map Cabal.ModuleName [Name ()]
   }
 
 instance Monoid ChosenImports where
@@ -29,12 +31,44 @@ insertQualified :: ModuleName () -> Cabal.ModuleName -> ChosenImports -> ChosenI
 insertQualified qualification module_ chosenImports = chosenImports
   { qualifieds = Map.insert qualification module_ (qualifieds chosenImports) }
 
-insertUnqualified :: Cabal.ModuleName -> ChosenImports -> ChosenImports
-insertUnqualified module_ chosenImports = chosenImports
-  { unqualifieds = module_ : unqualifieds chosenImports }
+insertUnqualified :: Cabal.ModuleName -> Name () -> ChosenImports -> ChosenImports
+insertUnqualified module_ name chosenImports = chosenImports
+  { unqualifieds = insertWith (++) module_ [name] (unqualifieds chosenImports) }
 
 insertChoice :: QName a -> Cabal.ModuleName -> ChosenImports -> ChosenImports
 insertChoice qname module_ =
-  case getQualification qname of
-    Just qualification -> insertQualified qualification module_
-    Nothing            -> insertUnqualified module_
+  case qname of
+    Qual _ qualification _ -> insertQualified (void qualification) module_
+    UnQual _ name          -> insertUnqualified module_ (void name)
+    Special _ _            -> error "impossible: insertChoice"
+
+isEmpty :: ChosenImports -> Bool
+isEmpty ci = Map.null (qualifieds ci) && Map.null (unqualifieds ci)
+
+showChosenImports :: ChosenImports -> [String]
+showChosenImports ci = showQualifieds (qualifieds ci) ++ showUnqualifieds (unqualifieds ci)
+
+showQualifieds :: Map (ModuleName ()) Cabal.ModuleName -> [String]
+showQualifieds = map (uncurry showQualified) . Map.toList
+
+showUnqualifieds :: Map Cabal.ModuleName [Name ()] -> [String]
+showUnqualifieds = map (uncurry showUnqualified) . Map.toList
+
+showQualified :: ModuleName () -> Cabal.ModuleName -> String
+showQualified qualification modName =
+    intercalate " "
+      [ "import"
+      , "qualified"
+      , Cabal.display modName
+      , "as"
+      , prettyPrint qualification
+      ]
+showUnqualified :: Cabal.ModuleName -> [Name ()] -> String
+showUnqualified modName names =
+    intercalate " "
+      [ "import"
+      , Cabal.display modName
+      , "("
+      ,  intercalate ", " $ map prettyPrint names
+      , ")"
+      ]
