@@ -34,6 +34,9 @@ executable halberd
   hs-source-dirs:      src
   main-is:             Halberd.hs
   ghc-options:         -Wall
+  other-modules:       Halberd.ChosenImports
+                     , Halberd.CollectNames
+                     , Language.Haskell.Exts.Utils
 
 Source-Repository head
   Type:                git
