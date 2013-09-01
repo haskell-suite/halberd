@@ -8,13 +8,14 @@ category:            Development
 build-type:          Simple
 cabal-version:       >=1.8
 synopsis:            A tool to generate missing import statements for Haskell modules.
-description:         This tool uses <https://github.com/haskell-suite
-                     the Haskell Suite> to determine the unbound
-                     variables and types in your source code, and
-                     generate import statements for them. If there are
-                     multiple choices, it provides a simple
+description:         This tool uses the Haskell Suite [0] to determine
+                     the unbound variables and types in your source
+                     code, and generate import statements for them. If
+                     there are multiple choices, it provides a simple
                      interactive menu for you to choose from. See the
                      home page for more details.
+
+                     [0] https://github.com/haskell-suite
 homepage:            http://github.com/haskell-suite/halberd/
 extra-source-files:  CHANGELOG, README.md
 
