@@ -34,7 +34,9 @@ import           System.Environment
 import           System.Exit
 import           System.IO
 
+import           Halberd.ChosenImports
 import           Halberd.CollectNames                (collectUnboundNames)
+import           Language.Haskell.Exts.Utils
 
 main :: IO ()
 main =
@@ -77,41 +79,6 @@ main =
 
 type Suggestion a = (QName (Scoped SrcSpan), [CanonicalSymbol a])
 type Choice a = (QName (Scoped SrcSpan), CanonicalSymbol a)
-data ChosenImports = ChosenImports
-  { qualifieds   :: Map (ModuleName ()) Cabal.ModuleName
-  , unqualifieds :: [Cabal.ModuleName]
-  }
-
-instance Monoid ChosenImports where
-  mempty = ChosenImports
-    { qualifieds   = mempty
-    , unqualifieds = mempty
-    }
-  i1 `mappend` i2 = ChosenImports
-    { qualifieds   = qualifieds   i1 `mappend`  qualifieds i2
-    , unqualifieds = unqualifieds i1 `mappend`  unqualifieds i2
-    }
-
-lookupQualified :: ModuleName () -> ChosenImports -> Maybe Cabal.ModuleName
-lookupQualified qualification = Map.lookup qualification . qualifieds
-
-insertQualified :: ModuleName () -> Cabal.ModuleName -> ChosenImports -> ChosenImports
-insertQualified qualification module_ chosenImports = chosenImports
-  { qualifieds = Map.insert qualification module_ (qualifieds chosenImports) }
-
-insertUnqualified :: Cabal.ModuleName -> ChosenImports -> ChosenImports
-insertUnqualified module_ chosenImports = chosenImports
-  { unqualifieds = module_ : unqualifieds chosenImports }
-
-insertChoice :: QName a -> Cabal.ModuleName -> ChosenImports -> ChosenImports
-insertChoice qname module_ =
-  case getQualification qname of
-    Just qualification -> insertQualified qualification module_
-    Nothing            -> insertUnqualified module_
-
-getQualification :: QName a -> Maybe (ModuleName ())
-getQualification (Qual _ q _) = Just $ void q
-getQualification _            = Nothing
 
 data Import = Qualified (ModuleName ()) Cabal.ModuleName
             | Explicit Cabal.ModuleName [Name ()]
