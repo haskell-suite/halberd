@@ -12,7 +12,7 @@ import qualified Distribution.Text       as Cabal
 data ChosenImports = ChosenImports
   { qualifieds   :: Map (ModuleName ()) Cabal.ModuleName
   , unqualifieds :: Map Cabal.ModuleName [Name ()]
-  }
+  } deriving (Show, Eq)
 
 instance Monoid ChosenImports where
   mempty = ChosenImports
