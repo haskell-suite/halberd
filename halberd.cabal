@@ -38,6 +38,7 @@ executable halberd
                      , Halberd.ChosenImports
                      , Halberd.CollectNames
                      , Halberd.LookupTable
+                     , Halberd.Suggestions
                      , Halberd.Types
                      , Halberd.UI
                      , Language.Haskell.Exts.Utils
