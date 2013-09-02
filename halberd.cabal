@@ -25,7 +25,7 @@ library
                      , haskell-packages == 0.2.*
                      , haskell-names    == 0.2.*
                      , haskell-src-exts == 1.14.*
-                     , Cabal            >= 1.17   &&  < 1.19
+                     , Cabal            >= 1.16   &&  < 1.19
                      , mtl              >= 2.0    &&  < 2.2
                      , safe             == 0.3.*
                      , syb              >= 0.3    &&  < 0.5
@@ -41,8 +41,8 @@ library
 
 executable halberd
   build-depends:       base             >= 4.5    &&  < 4.7
-                     , Cabal            >= 1.17   &&  < 1.19
-                     , halberd          == 0.1.1
+                     , Cabal            >= 1.16   &&  < 1.19
+                     , halberd
                      , haskell-names    == 0.2.*
                      , haskell-packages == 0.2.*
                      , haskell-src-exts == 1.14.*
@@ -56,9 +56,9 @@ executable halberd
 
 Test-suite halberd-tests
   build-depends:       base                 >= 4.5    && < 4.7
-                     , Cabal                >= 1.17   && < 1.19
+                     , Cabal                >= 1.16   && < 1.19
                      , containers           >= 0.4    && < 0.6
-                     , halberd              == 0.1.1
+                     , halberd
                      , HUnit                == 1.2.*
                      , test-framework       == 0.8.*
                      , test-framework-hunit == 0.3.*
