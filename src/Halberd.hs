@@ -3,6 +3,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE DoAndIfThenElse      #-}
+{-# LANGUAGE FlexibleContexts     #-}
 
 import           Control.Applicative
 import           Control.Arrow
@@ -95,7 +96,7 @@ askUserChoices suggestions = execStateT (go suggestions) mempty
           modify $ insertChoice qname (snd3 choice)
           go ss
 
-resolveSuggestions :: [Suggestion] -> StateT ChosenImports IO [Suggestion]
+resolveSuggestions :: (Functor m, MonadState ChosenImports m) => [Suggestion] -> m [Suggestion]
 resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion@(qname, modules) ->
   do chosenModules <- get
      if alreadyChosen qname modules chosenModules
