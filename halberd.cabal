@@ -34,8 +34,11 @@ executable halberd
   hs-source-dirs:      src
   main-is:             Halberd.hs
   ghc-options:         -Wall
-  other-modules:       Halberd.ChosenImports
+  other-modules:       Data.Tuple.Utils
+                     , Halberd.ChosenImports
                      , Halberd.CollectNames
+                     , Halberd.LookupTable
+                     , Halberd.Types
                      , Language.Haskell.Exts.Utils
 
 Source-Repository head

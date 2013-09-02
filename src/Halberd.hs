@@ -13,30 +13,25 @@ import           Data.Foldable (forM_)
 import           Data.Function
 import           Data.List
 import           Data.Maybe
-import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
 import           Data.Monoid
-import           Data.Ord
 import           Data.Proxy
-import           Data.Set                            (Set)
-import qualified Data.Set                            as Set
 import           Distribution.HaskellSuite
-import qualified Distribution.InstalledPackageInfo   as Cabal
-import qualified Distribution.ModuleName             as Cabal
-import qualified Distribution.Package                as Cabal
 import           Distribution.Simple.Compiler
 import qualified Distribution.Text                   as Cabal
 import           Language.Haskell.Exts.Annotated
 import           Language.Haskell.Names
-import           Language.Haskell.Names.Imports      ()
 import           Language.Haskell.Names.Interfaces
 import           Safe
 import           System.Environment
 import           System.Exit
 import           System.IO
 
+import           Data.Tuple.Utils
 import           Halberd.ChosenImports
 import           Halberd.CollectNames                (collectUnboundNames)
+import           Halberd.LookupTable
+import           Halberd.Types
 import           Language.Haskell.Exts.Utils
 
 main :: IO ()
@@ -145,63 +140,5 @@ getChoice xs = withoutOutput go
          hSetEcho stdout echo
          return result
 
-type CanonicalSymbol = (PackageRef, Cabal.ModuleName, OrigName)
-
-data PackageRef = PackageRef
-  { installedPackageId :: Cabal.InstalledPackageId
-  , sourcePackageId    :: Cabal.PackageId
-  } deriving (Eq, Ord, Show)
-
-toPackageRef :: Cabal.InstalledPackageInfo_ m -> PackageRef
-toPackageRef pkgInfo =
-    PackageRef { installedPackageId = Cabal.installedPackageId pkgInfo
-               , sourcePackageId    = Cabal.sourcePackageId    pkgInfo
-               }
-
 findUnbound :: Module SrcSpanInfo -> ModuleT Symbols IO ([QName (Scoped SrcSpan)], [QName (Scoped SrcSpan)])
 findUnbound module_ = collectUnboundNames <$> annotateModule Haskell98 [] (fmap srcInfoSpan module_)
-
-type LookupTable = Map String [CanonicalSymbol]
-
-mkLookupTables :: ModuleT Symbols IO (LookupTable, LookupTable)
-mkLookupTables =
-  do pkgs <- getPackages
-     (valueDefs, typeDefs) <-
-       fmap mconcat $ forM pkgs $ \pkg ->
-         fmap mconcat $ forM (Cabal.exposedModules pkg) $ \exposedModule -> do
-            (Symbols values types) <- readModuleInfo (Cabal.libraryDirs pkg) exposedModule
-            let mkDefs qname = Set.map ((toPackageRef pkg, exposedModule,) . origName) qname
-            return (mkDefs values, mkDefs types)
-     let valueTable = toLookupTable (gUnqual . trd3) valueDefs
-         typeTable  = toLookupTable (gUnqual . trd3) typeDefs
-     return (valueTable, typeTable)
-  where
-    gUnqual (OrigName _ (GName _ n))  = n
-
-
-lookupDefinitions :: Map String [CanonicalSymbol] -> QName (Scoped SrcSpan) -> [CanonicalSymbol]
-lookupDefinitions symbolTable qname = fromMaybe [] $
-  do n <- unQName qname
-     Map.lookup n symbolTable
-  where
-    unQName (Qual    _ _ n) = Just (strName n)
-    unQName (UnQual  _   n) = Just (strName n)
-    unQName (Special _ _  ) = Nothing
-
-    strName (Ident  _ str)  = str
-    strName (Symbol _ str)  = str
-
-
-toLookupTable :: Ord k => (a -> k) -> Set a -> Map k [a]
-toLookupTable key = Map.fromList
-                  . map (fst . head &&& map snd)
-                  . groupBy ((==) `on` fst)
-                  . sortBy (comparing fst)
-                  . map (key &&& id)
-                  . Set.toList
-
-snd3 :: (a, b, c) -> b
-snd3 (_, y, _) = y
-
-trd3 :: (a, b, c) -> c
-trd3 (_, _, z) = z
