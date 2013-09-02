@@ -1,9 +1,4 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE ImplicitParams       #-}
-{-# LANGUAGE OverlappingInstances #-}
-{-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE DoAndIfThenElse      #-}
-{-# LANGUAGE FlexibleContexts     #-}
+module Main where
 
 import           Control.Applicative
 import           Control.Monad hiding (forM_)
