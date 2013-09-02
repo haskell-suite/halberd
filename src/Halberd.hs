@@ -77,14 +77,19 @@ suggestedImports module_ =
     unique = nubBy ((==) `on` void)
 
 askUserChoices :: [Suggestion] -> IO ChosenImports
-askUserChoices suggestions = execStateT (go suggestions) mempty
+askUserChoices = resolveAllSuggestions askUserChoice
+
+type ChooseExternal m = QName (Scoped SrcSpan) -> [CanonicalSymbol] -> m CanonicalSymbol
+
+resolveAllSuggestions :: (Functor m, Monad m) => ChooseExternal m -> [Suggestion] -> m ChosenImports
+resolveAllSuggestions chooseExternal suggestions = execStateT (go suggestions) mempty
   where
     go sugs = do
       remaining <- resolveSuggestions sugs
       case remaining of
         [] -> return []
         ((qname, modules):ss) -> do
-          choice <- askUserChoice qname modules
+          choice <- lift $ chooseExternal qname modules
           modify $ insertChoice qname (snd3 choice)
           go ss
 
