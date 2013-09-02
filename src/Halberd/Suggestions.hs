@@ -51,7 +51,14 @@ resolveAllSuggestions chooseExternal suggestions = execStateT (go suggestions) m
           go ss
 
 resolveSuggestions :: (Functor m, MonadState ChosenImports m) => [Suggestion] -> m [Suggestion]
-resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion@(qname, modules) ->
+resolveSuggestions suggestions =
+  do newSuggestions <- resolveSuggestionsOnePass suggestions
+     if suggestions == newSuggestions
+     then return newSuggestions
+     else resolveSuggestions newSuggestions
+
+resolveSuggestionsOnePass :: (Functor m, MonadState ChosenImports m) => [Suggestion] -> m [Suggestion]
+resolveSuggestionsOnePass suggestions = fmap catMaybes . forM suggestions $ \suggestion@(qname, modules) ->
   do chosenModules <- get
      if alreadyChosen qname modules chosenModules
      then
