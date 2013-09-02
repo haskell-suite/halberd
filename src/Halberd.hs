@@ -48,9 +48,7 @@ main =
          exitFailure
        (file:_) -> do
          (ParseOk module_) <- parseFile file
-         pkgs <- concat <$>
-           mapM
-             (getInstalledPackages (Proxy :: Proxy NamesDB))
+         pkgs <- concat <$> mapM (getInstalledPackages (Proxy :: Proxy NamesDB))
              [UserPackageDB, GlobalPackageDB, SpecificPackageDB "/Users/erik/doc/haskell-suite/.cabal-sandbox/x86_64-osx-haskell-names-0.1-packages.conf.d"]
          allSuggestions <- evalModuleT (suggestedImports module_) pkgs suffix readInterface
 
