@@ -39,6 +39,7 @@ executable halberd
                      , Halberd.CollectNames
                      , Halberd.LookupTable
                      , Halberd.Types
+                     , Halberd.UI
                      , Language.Haskell.Exts.Utils
 
 Source-Repository head

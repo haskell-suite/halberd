@@ -18,20 +18,19 @@ import           Data.Monoid
 import           Data.Proxy
 import           Distribution.HaskellSuite
 import           Distribution.Simple.Compiler
-import qualified Distribution.Text                   as Cabal
 import           Language.Haskell.Exts.Annotated
 import           Language.Haskell.Names
 import           Language.Haskell.Names.Interfaces
 import           Safe
 import           System.Environment
 import           System.Exit
-import           System.IO
 
 import           Data.Tuple.Utils
 import           Halberd.ChosenImports
 import           Halberd.CollectNames                (collectUnboundNames)
 import           Halberd.LookupTable
 import           Halberd.Types
+import           Halberd.UI
 import           Language.Haskell.Exts.Utils
 
 main :: IO ()
@@ -113,32 +112,6 @@ resolveSuggestions suggestions = fmap catMaybes . forM suggestions $ \suggestion
     singleOrigName = allEqual . map trd3
     allEqual []     = True
     allEqual (x:xs) = all (== x) xs
-
-askUserChoice :: MonadIO m => QName (Scoped SrcSpan) -> [CanonicalSymbol] -> m CanonicalSymbol
-askUserChoice qname suggestions  = liftIO $
-  do putStrLn $ prettyPrint qname ++ ":"
-     forM_ (zip [1 :: Integer ..] suggestions) $ \(i, (_, modName, _)) -> putStrLn $ show i ++ ") " ++ Cabal.display modName
-     putStrLn ""
-     getChoice suggestions
-
-getChoice :: [a] -> IO a
-getChoice xs = withoutOutput go
-  where
-    go =
-      do c <- getChar
-         let mi = readMay [c]
-         case (subtract 1) <$> mi >>= atMay xs of
-           Nothing -> go
-           Just x  -> return x
-    withoutOutput action =
-      do buffering <- hGetBuffering stdin
-         echo <- hGetEcho stdout
-         hSetBuffering stdin NoBuffering
-         hSetEcho stdout False
-         result <- action
-         hSetBuffering stdin buffering
-         hSetEcho stdout echo
-         return result
 
 findUnbound :: Module SrcSpanInfo -> ModuleT Symbols IO ([QName (Scoped SrcSpan)], [QName (Scoped SrcSpan)])
 findUnbound module_ = collectUnboundNames <$> annotateModule Haskell98 [] (fmap srcInfoSpan module_)
