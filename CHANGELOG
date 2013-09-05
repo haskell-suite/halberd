@@ -1,3 +1,6 @@
+0.1.2.2:
+  * Remove hardcoded path from source.
+
 0.1.2.1:
   * Relax Cabal constraint.
   * Remove halberd constraint. It made the last version unbuildable.
