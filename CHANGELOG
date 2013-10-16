@@ -1,3 +1,6 @@
+0.1.2.3
+  * Allow haskell-names 0.3.
+
 0.1.2.2:
   * Remove hardcoded path from source.
 
