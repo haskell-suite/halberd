@@ -1,3 +1,6 @@
+0.1.2.4
+  * Allow base 4.7 (GHC 7.8).
+
 0.1.2.3
   * Allow haskell-names 0.3.
 
