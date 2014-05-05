@@ -1,3 +1,6 @@
+0.1.2.6
+  * Allow Cabal 1.20.*.
+
 0.1.2.5
   * Allow haskell-src-exts 1.15.
 
