@@ -26,7 +26,7 @@ library
                      , haskell-names    >= 0.2    &&  < 0.4
                      , haskell-src-exts >= 1.14   &&  < 1.16
                      , Cabal            >= 1.16   &&  < 1.22
-                     , mtl              >= 2.0    &&  < 2.2
+                     , mtl              >= 2.0    &&  < 2.3
                      , safe             == 0.3.*
                      , syb              >= 0.3    &&  < 0.5
   hs-source-dirs:      src
@@ -46,7 +46,7 @@ executable halberd
                      , haskell-names    >= 0.2    &&  < 0.4
                      , haskell-packages == 0.2.*
                      , haskell-src-exts >= 1.14   &&  < 1.16
-                     , mtl              >= 2.0    &&  < 2.2
+                     , mtl              >= 2.0    &&  < 2.3
                      , safe             == 0.3.*
                      , tagged           >= 0.4    &&  < 0.8
   hs-source-dirs:      exe
@@ -67,7 +67,7 @@ Test-suite halberd-tests
                      , haskell-src-exts     >= 1.14   && < 1.16
                      , tagged               >= 0.4    && < 0.8
                      , split                == 0.2.*
-                     , mtl                  >= 2.0    && < 2.2
+                     , mtl                  >= 2.0    && < 2.3
   hs-source-dirs:      tests
   main-is:             Runner.hs
   type:                exitcode-stdio-1.0
