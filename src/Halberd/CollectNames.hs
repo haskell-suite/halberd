@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Halberd.CollectNames
   ( collectUnboundNames
   ) where
@@ -36,6 +37,9 @@ collectUnboundNames module_ = partitionEithers $ do
         `extQ` namesFromType
         `extQ` namesFromExp
         `extQ` namesFromFieldUpdate
+#if MIN_VERSION_haskell_src_exts(1,15,0)
+        `extQ` namesFromPromoted
+#endif
 
 namesFromAsst :: Asst l -> [(NameSpace, QName l)]
 namesFromAsst x = case x of
@@ -62,6 +66,18 @@ namesFromType x = case x of
     TyParen _ _      -> []
     TyInfix _ _ qn _ -> [(TypeSpace, qn)]
     TyKind _ _ _     -> []
+#if MIN_VERSION_haskell_src_exts(1,15,0)
+    TyPromoted _ _   -> []
+
+namesFromPromoted :: Promoted l -> [(NameSpace, QName l)]
+namesFromPromoted x = case x of
+    PromotedInteger{}  -> []
+    PromotedString{}   -> []
+    PromotedCon _ _ qn -> [(TypeSpace, qn)]
+    PromotedList{}     -> []
+    PromotedTuple{}    -> []
+    PromotedUnit{}     -> []
+#endif
 
 namesFromExp :: Exp l -> [(NameSpace, QName l)]
 namesFromExp x = case x of
@@ -75,6 +91,9 @@ namesFromExp x = case x of
     Lambda _ _ _           -> []
     Let _ _ _              -> []
     If _ _ _ _             -> []
+#if MIN_VERSION_haskell_src_exts(1,15,0)
+    MultiIf _ _            -> []
+#endif
     Case _ _ _             -> []
     Do _ _                 -> []
     MDo _ _                -> []
@@ -111,6 +130,9 @@ namesFromExp x = case x of
     RightArrApp _ _ _      -> []
     LeftArrHighApp _ _ _   -> []
     RightArrHighApp _ _ _  -> []
+#if MIN_VERSION_haskell_src_exts(1,15,0)
+    LCase _ _              -> []
+#endif
 
 
 namesFromFieldUpdate :: FieldUpdate l -> [(NameSpace, QName l)]
