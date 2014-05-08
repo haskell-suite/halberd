@@ -1,3 +1,7 @@
+0.1.2.7
+  * Fix missing cases when using haskell-src-exts 1.15.
+  * Allow mtl 2.2.
+
 0.1.2.6
   * Allow Cabal 1.20.*.
 
