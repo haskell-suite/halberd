@@ -1,5 +1,5 @@
 name:                halberd
-version:             0.1.2.7
+version:             0.1.2.8
 license:             BSD3
 license-file:        LICENSE
 author:              Erik Hesselink, Simon Meier, Tom Lokhorst, Roman Cheplyaka
@@ -23,7 +23,7 @@ library
   build-depends:       base             >= 4.5    &&  < 4.8
                      , containers       >= 0.4    &&  < 0.6
                      , haskell-packages == 0.2.*
-                     , haskell-names    >= 0.2    &&  < 0.4
+                     , haskell-names    >= 0.2    &&  < 0.5
                      , haskell-src-exts >= 1.14   &&  < 1.16
                      , Cabal            >= 1.16   &&  < 1.22
                      , mtl              >= 2.0    &&  < 2.3
@@ -43,7 +43,7 @@ executable halberd
   build-depends:       base             >= 4.5    &&  < 4.8
                      , Cabal            >= 1.16   &&  < 1.22
                      , halberd
-                     , haskell-names    >= 0.2    &&  < 0.4
+                     , haskell-names    >= 0.2    &&  < 0.5
                      , haskell-packages == 0.2.*
                      , haskell-src-exts >= 1.14   &&  < 1.16
                      , mtl              >= 2.0    &&  < 2.3
@@ -62,7 +62,7 @@ Test-suite halberd-tests
                      , HUnit                == 1.2.*
                      , test-framework       == 0.8.*
                      , test-framework-hunit == 0.3.*
-                     , haskell-names        >= 0.2    && < 0.4
+                     , haskell-names        >= 0.2    && < 0.5
                      , haskell-packages     == 0.2.*
                      , haskell-src-exts     >= 1.14   && < 1.16
                      , tagged               >= 0.4    && < 0.8
